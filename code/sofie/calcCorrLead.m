@@ -1,7 +1,6 @@
 function [corr_TE] = calcCorrLead(Cxxe,Y,wx,wy,wt,idx)
 % Inputs:
 %   idx - validation set indices
-
 Nt = length(wt);
 Y=bsxfun(@minus, Y, mean(Y,2));
 if idx(1)==1

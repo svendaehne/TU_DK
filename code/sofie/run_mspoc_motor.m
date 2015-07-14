@@ -129,6 +129,25 @@ subplot(rows,cols,3)
 imagesc(R_te+R_tr);%, [0,1])
 colorbar
 title('sum of correlations on training and test data')
+%% Find optimal gamma
+n_components = 1;
+
+mspoc_opt.n_component_sets = n_components;
+mspoc_opt.verbose = 2;
+mspoc_opt.kappa_tau = best_kappa_tau;
+mspoc_opt.kappa_y = best_kappa_y;
+
+mspoc_opt.kappa_tau = 10.^-3;
+mspoc_opt.kappa_y = 10.^0;
+
+
+
+Gamma=linspace(0,1,5);
+Ne = size(Yr,2);
+Kf=4;
+[gamma, CrossEcut, corr_TEkf]=mspocGitAugCrossLead(Cxxe, Yr,L,tau_vector,mspoc_opt.kappa_tau,mspoc_opt.kappa_y,Ne,Kf,Gamma,1)
+
+
 
 %% run mspoc
 n_components = 1;
@@ -143,7 +162,7 @@ mspoc_opt.kappa_y = 10.^0;
 
 
 %[Wx, Wy, Wtau, Ax, Ay, mspoc_out] = mspocGit([], Yr, mspoc_opt);
-[Wx, Wy, Wt, Ax, Ay, mspoc_out] = mspocGitAugLead([], Yr,[],0,mspoc_opt);
+[Wx, Wy, Wt, Ax, Ay, mspoc_out] = mspocGitAugLead([], Yr,L,0.5,mspoc_opt);
 
 
 %% plot results
