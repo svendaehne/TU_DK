@@ -7,8 +7,8 @@ addpath C:\Users\sofha\SPoC\matlab_SPoC\utils
 addpath C:\Users\sofha\SPoC\matlab_SPoC\SSD
 
 data_folder = 'C:\Users\sofha\SPoC\matlab_SPoC-master\Data';
-%run_name = 'motor_execution';freq=20;
-run_name = 'eyes_open_closed';freq=10;
+run_name = 'motor_execution';freq=20;
+%run_name = 'eyes_open_closed';freq=10;
 % freq = [
 %     2.^(log2(freq)+[-0.25, 0.25]);
 %     2.^(log2(freq)+[-0.8, 0.8]);
@@ -63,7 +63,7 @@ L = tmp.L(:,brain_mask,:);
     'fmri_mask', M,...
     'n_ssd_components', 20, ...
     'upsample_factor', 2, ...
-    'fmri_PCA_var_expl', 0.95, ...
+    'fmri_PCA_var_expl', 0.99, ...
     'verbose', 0, ...
     'data_info', data_info);
 upsample_factor = info.preprocessing_opt.upsample_factor;
@@ -81,6 +81,13 @@ if not(size(L,2) == size(Yr,1))
     error('Nr of voxels does not match number of dipole locs in the leadfield!')
 end
 
+%% reduce size of L
+Lnew=NaN(size(L,1),size(L,2));
+for ny=1:size(Yr,1);
+Lcov = squeeze(L(:,ny,:))'*Cxx*squeeze(L(:,ny,:));
+[eigV,SCORE] = pcacov(Lcov);
+Lnew(:,ny)=eigV(1)*L(:,ny,1)+eigV(2)*L(:,ny,2)+eigV(3)*L(:,ny,3);
+end
 %% mspoc opts
 tau_vector = 0:info.fmri.fs:20;
 [~, Nx, Ne] = size(Cxxe);
@@ -138,13 +145,13 @@ mspoc_opt.verbose = 2;
 %mspoc_opt.kappa_tau = best_kappa_tau;
 %mspoc_opt.kappa_y = best_kappa_y;
 
-mspoc_opt.kappa_tau = 10.^-3;
+mspoc_opt.kappa_tau = 10.^-1;
 KappaY=1;%logspace(-2,2,5);
 
 mspoc_opt.kappaY = logspace(-2,2,5);
 Gamma=linspace(0,1,15);
 Kf=4;
-No_Ne=200:100:800;
+No_Ne=200:100:300;
 
 for ne=1:length(No_Ne)
     fprintf('runnning epoch %d out of 4\n',ne)
@@ -172,15 +179,15 @@ n_components = 2;
 
 mspoc_opt.n_component_sets = n_components;
 mspoc_opt.verbose = 2;
-mspoc_opt.kappa_tau = best_kappa_tau;
-mspoc_opt.kappa_y = best_kappa_y;
+%mspoc_opt.kappa_tau = best_kappa_tau;
+%mspoc_opt.kappa_y = best_kappa_y;
 
-%mspoc_opt.kappa_tau = 10.^-1;
-%mspoc_opt.kappa_y = 10.^1;
+mspoc_opt.kappa_tau = 10.^-1;
+mspoc_opt.kappa_y = 10.^1;
 
-%mspoc_opt.Cxxe = Cxxe(:,:,1:200)
+mspoc_opt.Cxxe = Cxxe(:,:,1:200)
 %[Wx, Wy, Wtau, Ax, Ay, mspoc_out] = mspocGit([], Yr, mspoc_opt);
-[Wx, Wy, Wt, Ax, Ay, mspoc_out] = mspocGitAugLead([], Yr,L,0.5,mspoc_opt);
+[Wx, Wy, Wt, Ax, Ay, mspoc_out] = mspocGitAugLead([], Yr(:,1:200),L,0.2,mspoc_opt);
 
 
 %% plot results
@@ -189,10 +196,10 @@ mspoc_out.tau_vector = mspoc_opt.tau_vector;
 fig_h = viz_mspoc_components(Wx, Wy, Wt, Ax, Ay, mspoc_out, Cxxe, Yr, info);
 %%
 load('C:\Users\sofha\SPoC\matlab_SPoC-master\EEGpos2D')
-nc=1;
+for nc=1:n_components;
 [ZI,f] = spm_eeg_plotScalpData(Ax(:,nc),xy,EEGlab);
 caxis([-max(abs(Ax(:,nc))),max(abs(Ax(:,nc)))])
-
+end
 %%
 Axy=squeeze(L(:,:,1))*Ay;
 Axy=Axy/max(abs(Axy));
