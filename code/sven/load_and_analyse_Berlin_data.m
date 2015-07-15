@@ -1,63 +1,58 @@
 
 %% params
 
-data_folder = '/home/bbci/data/daehne/EEG_fMRI_MPI_Leipzig/EEG-fMRI_Benchmark/preprocessed_EEG_fMRI_matfiles/';
+data_folder = '/home/bbci/data/daehne/EEG_fMRI_Berlin_2014/preprocessed_EEG_fMRI_matfiles/';
 
-% run_name = 'motor_execution';
-run_name = 'eyes_open_closed';
-
+sbj = 'Sbj_5206';
+run_name = 'Rest';
 
 % frequency of interest
 freq = 10;
-% freq = [
-%     2.^(log2(freq)+[-0.25, 0.25]);
-%     2.^(log2(freq)+[-0.8, 0.8]);
-%     2.^(log2(freq)+[-0.4, 0.4]);
-%     ]
+freq = [
+    2.^(log2(freq)+[-0.25, 0.25]);
+    2.^(log2(freq)+[-0.8, 0.8]);
+    2.^(log2(freq)+[-0.4, 0.4]);
+    ]
 
 %% load data
 
-switch run_name
-    case 'motor_execution'
-        tmp = load(fullfile(data_folder, 'motor_data.mat'));
-    case 'eyes_open_closed'
-        tmp = load(fullfile(data_folder, 'eyesOpenClosed_data.mat'));
-end
+tmp = load(fullfile(data_folder, sprintf('%s_%s.mat', sbj, run_name)));
 
 X = tmp.X;
 Y = tmp.Y;
-data_info = tmp.dat_info;
+data_info = tmp.data_info;
 clear tmp
 
-%%
-% HERE WE HAVE TO CHANGE THE ORDER OF DIMS SO THAT IT CORRESPONDS TO
-% DANIELS STUFF
+% % HERE WE HAVE TO CHANGE THE ORDER OF DIMS SO THAT IT CORRESPONDS TO
+% % DANIELS STUFF
 Y = permute(Y,[2,1,3,4]);
 data_info.fmri.dim = data_info.fmri.dim([2,1,3]);
 data_info.fmri.mask = permute(data_info.fmri.mask, [2,1,3]);
 
 eeg_sf = data_info.eeg.fs;
 fmri_sf = data_info.fmri.fs;
-mask = data_info.fmri.mask;
 
 
 %% load Daniel's brain mask and leadfield
 
-
 % modify the grey matter mask such that voxels
 % outside the brain are not included anymore
-tmp = load(fullfile(data_folder,'brainmask.mat'));
-brain_mask = tmp.brainmask;
-M = zeros(size(mask));
-M(mask) = brain_mask;
+tmp = load(fullfile(data_folder,'brainmaskForfMRI.mat'));
+brain_mask = tmp.greymask;
+brain_mask = permute(brain_mask, [2,1,3]);
+M = zeros(size(brain_mask));
+M(brain_mask) = 1;
 
-figure;
-plot_brain2d(M, 4,6,3, max(abs(M(:)))*[-1,1]);
+% figure;
+% plot_brain2d(M, 4,6,3, max(abs(M(:)))*[-1,1]);
 
 M = M > 0;
 
-tmp = load(fullfile(data_folder,'leadfieldSofieANDSven.mat'));
-L = tmp.L(:,brain_mask,:);
+% load the leadfield
+tmp = load(fullfile(data_folder,sprintf('%s_leadfieldwfMRI.mat',sbj)));
+tmp2 = load(fullfile(data_folder,'brainmask.mat'));
+L = tmp.L(:,tmp2.brainmask,:);
+
 
 %% preprocess data
 
@@ -99,7 +94,7 @@ mspoc_opt = struct(...
 
 %% optimize regularizers
 kappa_tau_list = 10.^(-2:1:2);
-kappa_y_list = 10.^(-2:1:2);
+kappa_y_list = 10.^(-1:1:3);
     
 if length(kappa_tau_list) == 1 && length(kappa_y_list) ==1
     best_kappa_tau = kappa_tau_list(1);
@@ -114,7 +109,7 @@ else
 end
 
 %% run mspoc on training data
-n_components = 1;
+n_components = 2;
 mspoc_opt.n_component_sets = n_components;
 mspoc_opt.verbose = 1;
 mspoc_opt.Cxxe = Cxxe;
@@ -146,4 +141,5 @@ for n=1:length(indices)
         scalpPlot(mnt, squeeze(L(:,indices(n),k)), sc_opt);
     end
 end
+
 

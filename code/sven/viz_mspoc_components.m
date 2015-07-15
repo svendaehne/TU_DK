@@ -18,7 +18,7 @@ Cxxe_vec = reshape(Cxxe, [Nx*Nx, Ne]);
 
 t_vec = tau_vector/fmri_fs;
 
-max_lag = 30 * fmri_fs;
+max_lag = ceil(30 * fmri_fs);
 
 px_flt = zeros(n_components, Ne);
 px = zeros(n_components, Ne);
@@ -91,7 +91,7 @@ for k=1:n_components
     M = zeros(size(mask));
     M(mask) = Ay(:,k);
     fig_h(k,3) = figure;
-    M = permute(M, [2,1,3]);
+%     M = permute(M, [2,1,3]);
     plot_brain2d(M, 4,6,3, max(abs(M(:)))*[-1,1]);
     colormap(cmap_posneg(101));
 end
