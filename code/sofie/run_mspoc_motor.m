@@ -1,13 +1,14 @@
 
 %% params
+cd C:\Users\sofha\SPoC\TU_DK\code\sofie
 addpath C:\Users\sofha\SPoC\matlab_SPoC-master\OriginalCode\plot_brains
 addpath C:\Users\sofha\SPoC\TU_DK\code\sven
 addpath C:\Users\sofha\SPoC\matlab_SPoC\utils
 addpath C:\Users\sofha\SPoC\matlab_SPoC\SSD
 
 data_folder = 'C:\Users\sofha\SPoC\matlab_SPoC-master\Data';
-run_name = 'motor_execution';freq=20;
-%run_name = 'eyes_open_closed';freq=10;
+%run_name = 'motor_execution';freq=20;
+run_name = 'eyes_open_closed';freq=10;
 % freq = [
 %     2.^(log2(freq)+[-0.25, 0.25]);
 %     2.^(log2(freq)+[-0.8, 0.8]);
@@ -134,33 +135,50 @@ n_components = 1;
 
 mspoc_opt.n_component_sets = n_components;
 mspoc_opt.verbose = 2;
-mspoc_opt.kappa_tau = best_kappa_tau;
-mspoc_opt.kappa_y = best_kappa_y;
+%mspoc_opt.kappa_tau = best_kappa_tau;
+%mspoc_opt.kappa_y = best_kappa_y;
 
 mspoc_opt.kappa_tau = 10.^-3;
-mspoc_opt.kappa_y = 10.^0;
+KappaY=1;%logspace(-2,2,5);
 
-
-
-Gamma=linspace(0,1,5);
-Ne = size(Yr,2);
+mspoc_opt.kappaY = logspace(-2,2,5);
+Gamma=linspace(0,1,15);
 Kf=4;
-[gamma, CrossEcut, corr_TEkf]=mspocGitAugCrossLead(Cxxe, Yr,L,tau_vector,mspoc_opt.kappa_tau,mspoc_opt.kappa_y,Ne,Kf,Gamma,1)
+No_Ne=200:100:800;
 
+for ne=1:length(No_Ne)
+    fprintf('runnning epoch %d out of 4\n',ne)
+mspoc_opt.Cxxe = Cxxe(:,:,1:No_Ne(ne));
+epochs= 1:No_Ne(ne);
+clear mspoc_opt.Cxx;
+Yr_ne = Yr(:,epochs);
+Ne_new = size(Yr_ne,2);
+tic_cross=tic;
+[gamma(ne),kappa_y(ne),kappa_y0(ne), CrossEcut, corr_TEkf]=mspocGitAugCrossLead(Cxxe(:,:,epochs),Yr_ne,L,Ne_new,Kf,Gamma,mspoc_opt);
+gamma(ne)
+toc(tic_cross)
+mspoc_opt.kappa_y=kappa_y(ne);
+[Wx, Wy, Wt, Ax, Ay, mspoc_out] = mspocGitAugLead([], Yr_ne,L,gamma(ne),mspoc_opt);
+[corr_TE(ne), corr_TR(ne)] = calcCorrLead(Cxxe,Yr,Wx,Wy,Wt,801:1063,epochs);
 
+mspoc_opt.kappa_y=kappa_y0(ne);
+[Wx, Wy, Wt, Ax, Ay, mspoc_out] = mspocGitAugLead([], Yr_ne,[],0,mspoc_opt);
+[corr_TE0(ne), corr_TR0(ne)] = calcCorrLead(Cxxe,Yr,Wx,Wy,Wt,801:1063,epochs);
+
+end
 
 %% run mspoc
-n_components = 1;
+n_components = 2;
 
 mspoc_opt.n_component_sets = n_components;
 mspoc_opt.verbose = 2;
 mspoc_opt.kappa_tau = best_kappa_tau;
 mspoc_opt.kappa_y = best_kappa_y;
 
-mspoc_opt.kappa_tau = 10.^-3;
-mspoc_opt.kappa_y = 10.^0;
+%mspoc_opt.kappa_tau = 10.^-1;
+%mspoc_opt.kappa_y = 10.^1;
 
-
+%mspoc_opt.Cxxe = Cxxe(:,:,1:200)
 %[Wx, Wy, Wtau, Ax, Ay, mspoc_out] = mspocGit([], Yr, mspoc_opt);
 [Wx, Wy, Wt, Ax, Ay, mspoc_out] = mspocGitAugLead([], Yr,L,0.5,mspoc_opt);
 
@@ -225,4 +243,50 @@ for k=1:n_components
     tmp_h = rmfield(tmp_h, 'pinfo');
     tmp_h.fname = [fullfile(result_path, run_name, fig_name) '.nii'];
     spm_write_vol(tmp_h,M);
+end
+%%
+n_components = 1;
+
+mspoc_opt.n_component_sets = n_components;
+mspoc_opt.verbose = 2;
+mspoc_opt.kappa_tau = best_kappa_tau;
+mspoc_opt.kappa_y = best_kappa_y;
+
+mspoc_opt.kappa_tau = 10.^-2;
+KappaY=1;%logspace(-2,2,5);
+
+mspoc_opt.kappaY = logspace(-2,2,5);
+Gamma=linspace(0,1,10);
+Kf=4;
+corr_TEKF5 = zeros(Kf,1);
+corr_TRKF5 = zeros(Kf,1);
+corr_TEKF0 = zeros(Kf,1);
+corr_TRKF0 = zeros(Kf,1);
+
+val_idx=0;
+for kf=1:Kf  
+    val_idx = val_idx(end)+1:floor((Ne-val_idx(end))/(Kf+1-kf))+val_idx(end);
+    tr=1:Ne;
+    tr(val_idx)=[];
+    opt.Cyy = [];
+    opt.pca_Y_var_expl=0.95;
+    y_tr = Yr(:,tr);
+    Ne_new = length(tr);
+    mspoc_params.Cxxe = Cxxe(:,:,tr);
+   mspoc_opt.Cxxe = Cxxe(:,:,tr);
+
+    mspoc_params.verbose = 0;
+clear mspoc_opt.Cxx;
+tic_cross=tic;
+[gamma(kf),kappa_y(kf),kappa_y0(kf), CrossEcut, corr_TEkf]=mspocGitAugCrossLead(Cxxe(:,:,tr),y_tr,L,Ne_new,Kf,Gamma,mspoc_opt);
+gamma(kf)
+toc(tic_cross)
+mspoc_opt.kappa_y=kappa_y(ne);
+[Wx, Wy, Wt, Ax, Ay, mspoc_out] = mspocGitAugLead([], y_tr,L,gamma(kf),mspoc_opt);
+[corr_TEKF5(kf), corr_TRKF5(kf)] = calcCorrLead(Cxxe,Yr,Wx,Wy,Wt,val_idx,[]);
+
+mspoc_opt.kappa_y=kappa_y0(ne);
+[Wx, Wy, Wt, Ax, Ay, mspoc_out] = mspocGitAugLead([], y_tr,[],0,mspoc_opt);
+[corr_TEKF0(kf), corr_TRKF0(kf)] = calcCorrLead(Cxxe,Yr,Wx,Wy,Wt,val_idx,[]);
+
 end
