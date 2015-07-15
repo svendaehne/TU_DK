@@ -8,7 +8,7 @@ run_name = 'eyes_open_closed';
 
 
 % frequency of interest
-freq = 20;
+freq = 10;
 % freq = [
 %     2.^(log2(freq)+[-0.25, 0.25]);
 %     2.^(log2(freq)+[-0.8, 0.8]);
@@ -54,10 +54,10 @@ M(mask) = brain_mask;
 figure;
 plot_brain2d(M, 4,6,3, max(abs(M(:)))*[-1,1]);
 
-% M = M > 0;
-% 
-% tmp = load(fullfile(data_folder,'leadfieldSofieANDSven.mat'));
-% L = tmp.L(:,brain_mask,:);
+M = M > 0;
+
+tmp = load(fullfile(data_folder,'leadfieldSofieANDSven.mat'));
+L = tmp.L(:,brain_mask,:);
 
 %% preprocess data
 
@@ -65,7 +65,7 @@ plot_brain2d(M, 4,6,3, max(abs(M(:)))*[-1,1]);
     'fmri_mask', M,...
     'n_ssd_components', 20, ...
     'upsample_factor', 2, ...
-    'verbose', 0, ...
+    'verbose', 1, ...
     'data_info', data_info);
 upsample_factor = info.preprocessing_opt.upsample_factor;
 
@@ -98,7 +98,7 @@ mspoc_opt = struct(...
     );
 
 %% optimize regularizers
-kappa_tau_list = 10.^1; ...(-2:1:2);
+kappa_tau_list = 10.^(-2:1:2);
 kappa_y_list = 10.^(-2:1:2);
     
 if length(kappa_tau_list) == 1 && length(kappa_y_list) ==1
@@ -126,13 +126,11 @@ mspoc_opt.kappa_y = best_kappa_y;
 
 %% plot results on test data
 
-% mspoc_out.tau_vector = mspoc_opt.tau_vector;
-% info.fmri.mask = M;
 fig_h = viz_mspoc_components(Wx, Wy, Wtau, Ax, Ay, mspoc_opt, Cxxe, Yr, info);
 
 %%
 
-[max_values, sort_idx] = sort(Ay,'descend');
+[max_values, sort_idx] = sort(Ay(:,1),'descend');
 
 sc_opt = my_scalpMap_opt;
 mnt = getElectrodePositions(info.eeg.clab);
@@ -149,50 +147,3 @@ for n=1:length(indices)
     end
 end
 
-
-
-% %% split off test data
-% 
-% idx_te = 721:size(Yr,2);
-% Cxxe_te = Cxxe(:,:,idx_te);
-% Y_te = Yr(:,idx_te);
-% 
-% %% test amount of training data necessary
-% 
-% n_repeats = 10;
-% train_secs = [30,60:60:600];
-% 
-% n_repeats = 1;
-% train_secs = [700];
-% 
-% N = length(train_secs);
-% r = zeros(n_repeats, N);
-% for n=1:N
-%     
-%     %% repeat loop
-%     for m=1:n_repeats
-%         
-%         %% pick training data
-%         n_training_sec = train_secs(n);
-%         
-%         max_tr_idx = 720;
-%         start_idx = randperm(max_tr_idx-n_training_sec+1, 1);
-%         stop_idx = start_idx + n_training_sec - 1;
-%         
-%         idx_tr = start_idx:stop_idx;
-%         Cxxe_tr = Cxxe(:,:,idx_tr);
-%         Y_tr = Yr(:,idx_tr);
-%         
-%         %% this should be paralllized if possible!
-%         [r(m,n), out] = train_test_mSPoC(Cxxe_tr,Y_tr, Cxxe_te, Y_te);
-%         Wx = out.Wx;
-%         Wy = out.Wy;
-%         Wtau = out.Wtau;
-%         Ax = out.Ax;
-%         Ay = out.Ay;
-%         mspoc_opt = out.mspoc_opt;
-%         fprintf(' resulting correlation on test data: %g\n',r(m,n))
-%     end
-% end
-% 
-% fprintf('\n\n\n DONE. \n')
