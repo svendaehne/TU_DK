@@ -51,13 +51,13 @@ brain_mask = tmp.brainmask;
 M = zeros(size(mask));
 M(mask) = brain_mask;
 
-% figure;
-% plot_brain2d(M, 4,6,3, max(abs(M(:)))*[-1,1]);
+figure;
+plot_brain2d(M, 4,6,3, max(abs(M(:)))*[-1,1]);
 
-M = M > 0;
-
-tmp = load(fullfile(data_folder,'leadfieldSofieANDSven.mat'));
-L = tmp.L(:,brain_mask,:);
+% M = M > 0;
+% 
+% tmp = load(fullfile(data_folder,'leadfieldSofieANDSven.mat'));
+% L = tmp.L(:,brain_mask,:);
 
 %% preprocess data
 
