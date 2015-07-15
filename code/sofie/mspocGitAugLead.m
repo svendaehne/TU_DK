@@ -75,7 +75,6 @@ if isempty(opt.mask)
 end
 opt.mask(1:(length(tau)-1)) = 0;
 
-
 %% whiten the X and Y signal and store the whitening matrices
 if opt.verbose > 1
     fprintf('   start whitening\n')
@@ -150,7 +149,7 @@ for k=1:n_component_sets
     Y_dfl = By' * Y_w;
     
     % perform mSPoC optimization in whitened and deflated space
-    [wx, wy, wtau, r] = optimize_filters(Cxxe_dfl, Y_dfl, My*By, opt,G,Mx,My,gamma,Y);
+    [wx, wy, wtau, r] = optimize_filters(Cxxe_dfl, Y_dfl, My*By, opt,G,Mx,My,gamma,Y,Bx,By);
     
     % project weight vectors back into undeflated space
     Wx(:,k) = Bx * wx;
@@ -210,20 +209,21 @@ for k=1:size(Ay,2)
     Atau(:,k) = Cpp * Wtau(:,k);
 end
 
-
 out = [];
 out.corr_values = corr_values;
 out.Atau = Atau;
 out.Cxx=Cxx;
+out.mask=opt.mask;
 
 
-function [wx, wy, wt, max_corr, aux_tmp] = optimize_filters(Cxxe,Y,BMy,opt,G,Mx,My,gamma,Y_un)
+function [wx, wy, wt, max_corr, aux_tmp] = optimize_filters(Cxxe,Y,BMy,opt,G,Mx,My,gamma,Y_un,Bx,By)
 % compute a single component pair in X and Y
 % Whiten leadfield 
+%size(Mx),size(Bx),size(G)
 if isempty(G)==0
-    L_xdefl = zeros(size(Mx,2),size(G,2),3);
+    L_xdefl = zeros(size((Mx*Bx),2),size(G,2),3);
     for dim=1:3
-        L_xdefl(:,:,dim) = Mx'*G(:,:,dim);%*pinv(My')
+        L_xdefl(:,:,dim) = (Mx*Bx)'*G(:,:,dim);%*pinv(My')
     end
 end
 
@@ -286,7 +286,8 @@ for n=1:opt.n_random_initializations
         [wt, wy] = my_reg_CCA2(Pxe(:,mask), Y(:,mask), kappa_tau, Dpp, Cyy_inv);
         
         %% If leadfield is available calculate it's projection to the EEG sensors
-                Wy=My*wy;
+       
+        Wy=My*By*wy;
         Sy = Wy' * Y_un;
         Ay = Y_un * (Y_un' * Wy) / (Sy*Sy'); % - avoid calculate spatial cov
 
@@ -295,7 +296,7 @@ for n=1:opt.n_random_initializations
             if opt.Ay_cut==1 && ii>2
                 Ay(abs(Ay)~=max(abs(Ay)))=0;
             end
-            Axy_defl = zeros(size(Mx,2),3);
+            Axy_defl = zeros(size(Mx*Bx,2),3);
             for dim=1:3
                 Axy_defl(:,dim) = squeeze(L_xdefl(:,:,dim)*Ay);
             end
@@ -447,20 +448,6 @@ end
 
 
 function [Y_w, My] = prepare_Y_signal(Y, opt)
-
-% % PCA via singular value decomposition 
-% [U,S] = svd(Y,'econ');
-% ev_sorted = diag(S).^2; % PCA eigenvalues
-% var_expl = cumsum(ev_sorted)./sum(ev_sorted);
-% min_var_expl = opt.pca_Y_var_expl; 
-% n = find(var_expl >= min_var_expl, 1, 'first');
-% 
-% % whitening matrix
-% My = U * diag(1./diag(S));
-% My = My(:,1:n);
-% % whitened signal
-% Y_w = My' * Y;
-
 
 % compute covariance matrix
 [Ny, Ne] = size(Y);
