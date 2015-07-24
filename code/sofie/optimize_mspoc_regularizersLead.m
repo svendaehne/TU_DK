@@ -1,5 +1,5 @@
 function [best_kappa_tau, best_kappa_y, out] = ...
-    optimize_mspoc_regularizersGit(X, Y, mspoc_params, varargin)
+    optimize_mspoc_regularizersLead(X, Y, mspoc_params, varargin)
 
 opt = propertylist2struct(varargin{:});
 opt = set_defaults(opt ...
@@ -111,7 +111,7 @@ for ii=1:n_kappa_tau
             %% compute correlations on training and test data
             tmp = corrcoef(sy_est(tr_idx{k}), px_flt_est(tr_idx{k}));
             corr_tr(ii,jj,k) = abs(tmp(1,2));
-            corr_tr(ii,jj,k)
+            %corr_tr(ii,jj,k);
             tmp = corrcoef(sy_est(te_idx{k}), px_flt_est(te_idx{k}));
             corr_te(ii,jj,k) = abs(tmp(1,2));
             

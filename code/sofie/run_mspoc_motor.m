@@ -65,9 +65,11 @@ L = tmp.L(:,brain_mask,:);
     'upsample_factor', 2, ...
     'fmri_PCA_var_expl', 0.99, ...
     'verbose', 0, ...
+    'noRed', 1, ...
     'data_info', data_info);
 upsample_factor = info.preprocessing_opt.upsample_factor;
 Cxx = squeeze(mean(Cxxe,3));
+Cxx_All = squeeze(mean(info.Cxxe_noRed,3));
 
 % remove outlier voxels from leadfield
 L(:,info.preprocessing_opt.bad_voxel_idx,:) = [];
@@ -82,9 +84,10 @@ if not(size(L,2) == size(Yr,1))
 end
 
 %% reduce size of L
+iCxx = inv(Cxx_All);
 Lnew=NaN(size(L,1),size(L,2));
-for ny=1:size(Yr,1);
-Lcov = squeeze(L(:,ny,:))'*Cxx*squeeze(L(:,ny,:));
+for ny=1:size(L,2);
+Lcov = squeeze(L(:,ny,:))'*iCxx*squeeze(L(:,ny,:));
 [eigV,SCORE] = pcacov(Lcov);
 Lnew(:,ny)=eigV(1)*L(:,ny,1)+eigV(2)*L(:,ny,2)+eigV(3)*L(:,ny,3);
 end
@@ -142,16 +145,17 @@ n_components = 1;
 
 mspoc_opt.n_component_sets = n_components;
 mspoc_opt.verbose = 2;
-%mspoc_opt.kappa_tau = best_kappa_tau;
-%mspoc_opt.kappa_y = best_kappa_y;
+mspoc_opt.kappa_tau = 1e-3;%best_kappa_tau;%
+mspoc_opt.kappa_y = 1;%best_kappa_y;%1
 
-mspoc_opt.kappa_tau = 10.^-1;
-KappaY=1;%logspace(-2,2,5);
+%mspoc_opt.kappa_tau = 10.^-1;
+%KappaY=logspace(-2,2,5);
 
 mspoc_opt.kappaY = logspace(-2,2,5);
-Gamma=linspace(0,1,15);
+mspoc_opt.kappaT = logspace(-3,2,6);
+Gamma=linspace(0,1,10);
 Kf=4;
-No_Ne=200:100:300;
+No_Ne=100:100:800;
 
 for ne=1:length(No_Ne)
     fprintf('runnning epoch %d out of 4\n',ne)
@@ -161,21 +165,22 @@ clear mspoc_opt.Cxx;
 Yr_ne = Yr(:,epochs);
 Ne_new = size(Yr_ne,2);
 tic_cross=tic;
-[gamma(ne),kappa_y(ne),kappa_y0(ne), CrossEcut, corr_TEkf]=mspocGitAugCrossLead(Cxxe(:,:,epochs),Yr_ne,L,Ne_new,Kf,Gamma,mspoc_opt);
+[gamma(ne),kappa_y(ne),kappa_t(ne),kappa_y0(ne),kappa_t0(ne), CrossEcut, corr_TEkf]=mspocGitAugCrossLead(info.Xe(:,:,epochs),Cxxe(:,:,epochs),Yr_ne,Lnew,Ne_new,Kf,Gamma,mspoc_opt);
 gamma(ne)
 toc(tic_cross)
-mspoc_opt.kappa_y=kappa_y(ne);
-[Wx, Wy, Wt, Ax, Ay, mspoc_out] = mspocGitAugLead([], Yr_ne,L,gamma(ne),mspoc_opt);
-[corr_TE(ne), corr_TR(ne)] = calcCorrLead(Cxxe,Yr,Wx,Wy,Wt,801:1063,epochs);
-
-mspoc_opt.kappa_y=kappa_y0(ne);
-[Wx, Wy, Wt, Ax, Ay, mspoc_out] = mspocGitAugLead([], Yr_ne,[],0,mspoc_opt);
-[corr_TE0(ne), corr_TR0(ne)] = calcCorrLead(Cxxe,Yr,Wx,Wy,Wt,801:1063,epochs);
+% mspoc_opt.kappa_y=kappa_y(ne);
+ [Wx, Wy, Wt, Ax, Ay, mspoc_out] = mspocGitAugLead([], Yr_ne,Lnew,gamma(ne),mspoc_opt);
+ [corr_TE(ne), corr_TR(ne)] = calcCorrLead(info.Xe,Cxxe,Yr,Wx,Wy,Wt,800:1063,epochs);
+% 
+ mspoc_opt.kappa_y=kappa_y0(ne);
+ Xe=reshape(X,400,25,540);
+ [Wx, Wy, Wt, Ax, Ay, mspoc_out] = mspocGitAugLead([], Yr_ne,[],0,mspoc_opt);
+ [corr_TE0(ne), corr_TR0(ne)] = calcCorrLead(info.Xe,Cxxe,Yr,Wx,Wy,Wt,800:1063,epochs);
 
 end
 
 %% run mspoc
-n_components = 2;
+n_components = 1;
 
 mspoc_opt.n_component_sets = n_components;
 mspoc_opt.verbose = 2;
@@ -185,13 +190,12 @@ mspoc_opt.verbose = 2;
 mspoc_opt.kappa_tau = 10.^-1;
 mspoc_opt.kappa_y = 10.^1;
 
-mspoc_opt.Cxxe = Cxxe(:,:,1:200)
+mspoc_opt.Cxxe = Cxxe;%(:,:,1:200)
 %[Wx, Wy, Wtau, Ax, Ay, mspoc_out] = mspocGit([], Yr, mspoc_opt);
-[Wx, Wy, Wt, Ax, Ay, mspoc_out] = mspocGitAugLead([], Yr(:,1:200),L,0.2,mspoc_opt);
+[Wx, Wy, Wt, Ax, Ay, mspoc_out] = mspocGitAugLead([], Yr,Lnew,0.2,mspoc_opt);
 
 
 %% plot results
-
 mspoc_out.tau_vector = mspoc_opt.tau_vector;
 fig_h = viz_mspoc_components(Wx, Wy, Wt, Ax, Ay, mspoc_out, Cxxe, Yr, info);
 %%

@@ -149,7 +149,7 @@ for k=1:n_component_sets
     Y_dfl = By' * Y_w;
     
     % perform mSPoC optimization in whitened and deflated space
-    [wx, wy, wtau, r] = optimize_filters(Cxxe_dfl, Y_dfl, My*By, opt,G,Mx,My,gamma,Y,Bx,By);
+    [wx, wy, wtau, r] = optimize_filters(Cxxe_dfl, Y_dfl, opt,G,Mx*Bx,My*By,gamma,Y);
     
     % project weight vectors back into undeflated space
     Wx(:,k) = Bx * wx;
@@ -216,14 +216,14 @@ out.Cxx=Cxx;
 out.mask=opt.mask;
 
 
-function [wx, wy, wt, max_corr, aux_tmp] = optimize_filters(Cxxe,Y,BMy,opt,G,Mx,My,gamma,Y_un,Bx,By)
+function [wx, wy, wt, max_corr, aux_tmp] = optimize_filters(Cxxe,Y,opt,G,MxBx,MyBy,gamma,Y_un)
 % compute a single component pair in X and Y
 % Whiten leadfield 
 %size(Mx),size(Bx),size(G)
 if isempty(G)==0
-    L_xdefl = zeros(size((Mx*Bx),2),size(G,2),3);
-    for dim=1:3
-        L_xdefl(:,:,dim) = (Mx*Bx)'*G(:,:,dim);%*pinv(My')
+    L_xdefl = zeros(size((MxBx),2),size(G,2),size(G,3));
+    for dim=1:size(G,3)
+        L_xdefl(:,:,dim) = (MxBx)'*G(:,:,dim);%*pinv(My')
     end
 end
 
@@ -246,7 +246,7 @@ Cxx = squeeze(mean(Cxxe(:,:,mask),3));
 kappa_y = opt.kappa_y;
 kappa_tau = opt.kappa_tau;
 
-Dyy = BMy'*BMy;
+Dyy = MyBy'*MyBy;
 Dyy = Dyy / trace(Dyy);
 Dpp = eye(Nt);
 Cyy = cov(Y(:,mask)'); 
@@ -287,23 +287,24 @@ for n=1:opt.n_random_initializations
         
         %% If leadfield is available calculate it's projection to the EEG sensors
        
-        Wy=My*By*wy;
-        Sy = Wy' * Y_un;
-        Ay = Y_un * (Y_un' * Wy) / (Sy*Sy'); % - avoid calculate spatial cov
+
 
         if isempty(G)==0
-            Caa = NaN(Nx,Nx,3);
+            Wy=MyBy*wy;
+            Sy = Wy' * Y_un;
+            Ay = Y_un * (Y_un' * Wy) / (Sy*Sy'); % - avoid calculate spatial cov
+            Caa = zeros(Nx,Nx,size(G,3));
             if opt.Ay_cut==1 && ii>2
                 Ay(abs(Ay)~=max(abs(Ay)))=0;
             end
-            Axy_defl = zeros(size(Mx*Bx,2),3);
-            for dim=1:3
+            Axy_defl = zeros(size(MxBx,2),size(G,3));
+            for dim=1:size(G,3)
                 Axy_defl(:,dim) = squeeze(L_xdefl(:,:,dim)*Ay);
             end
-            for dim = 1:3
+            for dim = 1:size(G,3)
                 Caa(:,:,dim)=Axy_defl(:,dim)*Axy_defl(:,dim)';
             end
-            Caa = sum(Caa,3);
+            if size(Caa,3)==3;Caa = sum(Caa,3);end
             Caa=Caa/trace(Caa);
         else
             Caa=1;

@@ -13,6 +13,7 @@ opt = set_defaults(opt, ...
     'fmri_lp_cutoff', 0.2, ...
     'fmri_mask', [], ...
     'data_info', [], ...
+    'run_ssd', 1, ...
     'verbose', 1);
 
 %% EEG preprocessing parameters
@@ -101,38 +102,37 @@ X = reshape(X, [size(X,1)*size(X,2), size(X,3)]);
 
 info.preprocessing_opt.A_ssd = A_ssd;
 info.preprocessing_opt.lambda_ssd = lambda_ssd;
-
 % SSD-denoising by projecting only a subset of components back to channel
 % space
+
 X = X_ssd(:,ssd_components) * A_ssd(:,ssd_components)';
 
 %% compute covariance matrix time-series (and median filter it)
 display('  -computing EEG cov-timeseries')
-
 X_epo = permute(reshape(X, [Te, size(X,1)/Te, size(X,2)]), [1,3,2]);
 Cxxe = epochwise_covariance(X_epo);
-Cxxe = median_filter_cov_timeseries(Cxxe,3, verbose);
-
+[X_epo, idx_flt, Cxxe] = median_filter_cov_timeseries(Cxxe,3, verbose);
 %% one more step of EEG outlier detection
-
 display('  -removing EEG outlier epochs')
 rm_idx = detect_max_eigenvalue_epochs(Cxxe,[],verbose,2);
-
+rm_idx1=rm_idx;
 %%
 Cxxe(:,:,rm_idx) = [];
 Y(:,rm_idx) = [];
+X_epo(:,:,rm_idx)=[];
 idx_vec(rm_idx) = [];
 
 %% detect fMRI artifact epochs
 
 display('  -removing fMRI outlier epochs')
 rm_idx = detect_high_variance_epochs(Y,[],verbose,2);
-
+rm_idx2=rm_idx;
 %%
 Cxxe(:,:,rm_idx) = [];
 Y(:,rm_idx) = [];
+X_epo(:,:,rm_idx)=[];
 idx_vec(rm_idx) = [];
-
+info.Xe=X_epo;
 %% detect bad fMRI voxels
 
 display('  -detecting fMRI outlier voxels')
@@ -151,34 +151,16 @@ Y = Y(mask2,:);
 mask(mask) = not(bad_chan);
 info.fmri.mask = mask;
 info.preprocessing_opt.bad_voxel_idx = bad_chan;
-
-
-
-% %% perform PCA on fMRI for dim-reduction
-% 
-% display('  -computing dim-reduction for fMRI')
-% % we assume there are more dimensions than samples, so we compute the 
-% % temporal covariance matrix
-% Cyy = Y'*Y;
-% 
-% % compute whitening matrix
-% [V,D] = eig(Cyy);
-% [ev_sorted, sort_idx] = sort(diag(D), 'descend');
-% V = V(:,sort_idx);
-% My = V * diag(ev_sorted.^-0.5); % whitening filters are in the columns
-% % PCA dim-reduction
-% var_expl = cumsum(ev_sorted)./sum(ev_sorted);
-% min_var_expl = opt.fmri_PCA_var_expl; 
-% n = find(var_expl >= min_var_expl, 1, 'first');
-% My = My(:,1:n);
-% 
-% % whitening and possible dim-reduction
-% Y_w = diag(std(V(:,1:n))) \ V(:,1:n)';
-% My = sqrt(Ne) * Y * (V(:,1:n) * diag(1./ev_sorted(1:n)'));
-%
-% info.fmri.My = My;
-% Y = Y_w;
-
+%% repeat for non-ssd-reduced EEG
+if opt.noRed==1
+X_noRed = X_ssd * A_ssd';
+X_epo_noRed = permute(reshape(X_noRed, [Te, size(X_noRed,1)/Te, size(X_noRed,2)]), [1,3,2]);
+Cxxe_noRed = epochwise_covariance(X_epo_noRed);
+Cxxe_noRed = median_filter_cov_timeseries(Cxxe_noRed,3, verbose);
+Cxxe_noRed(:,:,rm_idx1) = [];
+Cxxe_noRed(:,:,rm_idx2) = [];
+info.Cxxe_noRed=Cxxe_noRed;
+end
 %% done
 
 info.preprocessing_opt.idx_vector = idx_vec;
